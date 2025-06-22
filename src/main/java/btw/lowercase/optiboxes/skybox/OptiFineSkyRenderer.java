@@ -35,7 +35,6 @@ public final class OptiFineSkyRenderer {
     private GpuBuffer skyBuffer;
     private RenderSystem.AutoStorageIndexBuffer skyBufferIndices;
     private int skyBufferIndexCount;
-    private final Map<ResourceLocation, GpuTexture> textureCache = new HashMap<>();
     private final Map<ResourceLocation, RenderPipeline> renderPipelineCache = new HashMap<>();
 
     private OptiFineSkyRenderer() {
@@ -114,7 +113,7 @@ public final class OptiFineSkyRenderer {
             optiFineSkyLayer.blend().apply(finalAlpha);
             RenderTarget renderTarget = Minecraft.getInstance().getMainRenderTarget();
             GpuBuffer indexBuffer = this.skyBufferIndices.getBuffer(this.skyBufferIndexCount);
-            GpuTexture texture = this.textureCache.computeIfAbsent(optiFineSkyLayer.source(), (resourceLocation) -> Minecraft.getInstance().getTextureManager().getTexture(resourceLocation).getTexture());
+            GpuTexture texture = Minecraft.getInstance().getTextureManager().getTexture(optiFineSkyLayer.source()).getTexture();
             try (RenderPass renderPass = RenderSystem.getDevice()
                     .createCommandEncoder()
                     .createRenderPass(renderTarget.getColorTexture(), OptionalInt.empty(), renderTarget.getDepthTexture(), OptionalDouble.empty())) {
@@ -143,11 +142,6 @@ public final class OptiFineSkyRenderer {
     }
 
     public void clearCache() {
-        for (GpuTexture texture : this.textureCache.values()) {
-            texture.close();
-        }
-
-        this.textureCache.clear();
         this.renderPipelineCache.clear();
     }
 }
