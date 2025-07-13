@@ -10,7 +10,6 @@ import com.mojang.blaze3d.framegraph.FrameGraphBuilder;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.*;
@@ -59,7 +58,6 @@ public abstract class MixinLevelRenderer {
             ClientLevel clientLevel = Objects.requireNonNull(this.level);
             Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
             modelViewStack.pushMatrix();
-            modelViewStack.rotate(Axis.YP.rotationDegrees(-90.0F));
             for (OptiFineSkybox optiFineSkybox : activeSkyboxes) {
                 OptiFineSkyRenderer.INSTANCE.renderSkybox(optiFineSkybox, modelViewStack, clientLevel, 0.0F);
             }
@@ -94,7 +92,6 @@ public abstract class MixinLevelRenderer {
             ClientLevel clientLevel = Objects.requireNonNull(this.level);
             Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
             modelViewStack.pushMatrix();
-            modelViewStack.rotate(Axis.YP.rotationDegrees(-90.0F));
             RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
             for (OptiFineSkybox optiFineSkybox : activeSkyboxes) {
                 OptiFineSkyRenderer.INSTANCE.renderSkybox(optiFineSkybox, modelViewStack, clientLevel, this.optiboxes$tickDelta);
