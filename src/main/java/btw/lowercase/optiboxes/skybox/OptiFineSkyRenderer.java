@@ -2,6 +2,7 @@ package btw.lowercase.optiboxes.skybox;
 
 import btw.lowercase.optiboxes.OptiBoxesClient;
 import btw.lowercase.optiboxes.utils.CommonUtils;
+import btw.lowercase.optiboxes.utils.IrisUtil;
 import btw.lowercase.optiboxes.utils.UVRange;
 import btw.lowercase.optiboxes.utils.components.Blend;
 import com.mojang.blaze3d.buffers.BufferType;
@@ -117,7 +118,11 @@ public final class OptiFineSkyRenderer {
             try (RenderPass renderPass = RenderSystem.getDevice()
                     .createCommandEncoder()
                     .createRenderPass(renderTarget.getColorTexture(), OptionalInt.empty(), renderTarget.getDepthTexture(), OptionalDouble.empty())) {
-                RenderPipeline renderPipeline = this.renderPipelineCache.computeIfAbsent(optiFineSkyLayer.source(), (resourceLocation) -> getCustomSkyPipeline(optiFineSkyLayer.blend().getBlendFunction()));
+                RenderPipeline renderPipeline = this.renderPipelineCache.computeIfAbsent(optiFineSkyLayer.source(), (resourceLocation) -> {
+                    RenderPipeline pipeline = getCustomSkyPipeline(optiFineSkyLayer.blend().getBlendFunction());
+                    IrisUtil.assignPipeline(pipeline, IrisUtil.skyTextured());
+                    return pipeline;
+                });
                 renderPass.setPipeline(renderPipeline);
                 renderPass.setVertexBuffer(0, this.skyBuffer);
                 renderPass.setIndexBuffer(indexBuffer, this.skyBufferIndices.type());
