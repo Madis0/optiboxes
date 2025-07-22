@@ -10,6 +10,7 @@ import com.mojang.blaze3d.framegraph.FrameGraphBuilder;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.*;
@@ -23,7 +24,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.List;
 import java.util.Objects;
 
 @Mixin(value = LevelRenderer.class, priority = 900)
@@ -54,11 +54,11 @@ public abstract class MixinLevelRenderer {
 
         original.call(instance);
         if (isEnabled) {
-            List<OptiFineSkybox> activeSkyboxes = SkyboxManager.INSTANCE.getActiveSkyboxes();
             ClientLevel clientLevel = Objects.requireNonNull(this.level);
             Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
             modelViewStack.pushMatrix();
-            for (OptiFineSkybox optiFineSkybox : activeSkyboxes) {
+            modelViewStack.rotate(Axis.YP.rotationDegrees(-90.0F));
+            for (OptiFineSkybox optiFineSkybox : SkyboxManager.INSTANCE.getActiveSkyboxes()) {
                 OptiFineSkyRenderer.INSTANCE.renderSkybox(optiFineSkybox, modelViewStack, clientLevel, 0.0F);
             }
             modelViewStack.popMatrix();
@@ -88,12 +88,12 @@ public abstract class MixinLevelRenderer {
     private void optiboxes$renderSkyboxes(SkyRenderer instance, PoseStack poseStack, MultiBufferSource.BufferSource bufferSource, float timeOfDay, int moonPhases, float rainLevel, float starBrightness, FogParameters fogParameters, Operation<Void> original) {
         boolean isEnabled = SkyboxManager.INSTANCE.isEnabled(this.level);
         if (isEnabled) {
-            List<OptiFineSkybox> activeSkyboxes = SkyboxManager.INSTANCE.getActiveSkyboxes();
             ClientLevel clientLevel = Objects.requireNonNull(this.level);
             Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
             modelViewStack.pushMatrix();
+            modelViewStack.rotate(Axis.YP.rotationDegrees(-90.0F));
             RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
-            for (OptiFineSkybox optiFineSkybox : activeSkyboxes) {
+            for (OptiFineSkybox optiFineSkybox : SkyboxManager.INSTANCE.getActiveSkyboxes()) {
                 OptiFineSkyRenderer.INSTANCE.renderSkybox(optiFineSkybox, modelViewStack, clientLevel, this.optiboxes$tickDelta);
             }
             modelViewStack.popMatrix();

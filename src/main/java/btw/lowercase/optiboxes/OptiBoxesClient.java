@@ -19,6 +19,7 @@ import net.fabricmc.loader.api.ModContainer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.PackType;
+import net.minecraft.world.level.Level;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +30,7 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class OptiBoxesClient implements ClientModInitializer {
+public final class OptiBoxesClient implements ClientModInitializer {
     public static OptiBoxesClient INSTANCE;
     public static final String MOD_ID = "optiboxes";
 
@@ -62,11 +63,12 @@ public class OptiBoxesClient implements ClientModInitializer {
 
         ResourceManagerHelper.get(PackType.CLIENT_RESOURCES).registerReloadListener(new SkyboxResourceHelper());
         ClientTickEvents.END_WORLD_TICK.register(SkyboxManager.INSTANCE::tick);
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> dispatcher.register(ClientCommandManager.literal("optiboxes").executes((context) -> {
-            Minecraft minecraft = Minecraft.getInstance();
-            minecraft.schedule(() -> minecraft.setScreen(CONFIG_INSTANCE.getConfigScreen(minecraft.screen)));
-            return Command.SINGLE_SUCCESS;
-        })));
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
+                dispatcher.register(ClientCommandManager.literal(MOD_ID).executes((context) -> {
+                    Minecraft minecraft = Minecraft.getInstance();
+                    minecraft.schedule(() -> minecraft.setScreen(CONFIG_INSTANCE.getConfigScreen(minecraft.screen)));
+                    return Command.SINGLE_SUCCESS;
+                })));
     }
 
     public ModContainer getModContainer() {
@@ -77,90 +79,84 @@ public class OptiBoxesClient implements ClientModInitializer {
         return this.modContainer;
     }
 
-    public void convert(SkyboxResourceHelper managerAccessor) {
+    public void convert(SkyboxResourceHelper skyboxResourceHelper) {
         if (CONFIG_INSTANCE.processOptiFine.isEnabled()) {
-            this.parseSkyboxes(managerAccessor, OPTIFINE_SKY_PARENT, OPTIFINE_SKY_PATTERN);
+            this.parseSkyboxes(skyboxResourceHelper, OPTIFINE_SKY_PARENT, OPTIFINE_SKY_PATTERN);
         }
 
         if (CONFIG_INSTANCE.processMCPatcher.isEnabled()) {
-            this.parseSkyboxes(managerAccessor, MCPATCHER_SKY_PARENT, MCPATCHER_SKY_PATTERN);
+            this.parseSkyboxes(skyboxResourceHelper, MCPATCHER_SKY_PARENT, MCPATCHER_SKY_PATTERN);
         }
     }
 
     private void parseSkyboxes(SkyboxResourceHelper skyboxResourceHelper, String skyParent, Pattern skyPattern) {
         final JsonArray overworldLayers = new JsonArray();
         final JsonArray endLayers = new JsonArray();
-        skyboxResourceHelper.searchIn(skyParent)
-                .filter(id -> id.getPath().endsWith(".properties"))
-                .sorted(Comparator.comparing(ResourceLocation::getPath, (id1, id2) -> {
-                    Matcher matcherId1 = skyPattern.matcher(id1);
-                    Matcher matcherId2 = skyPattern.matcher(id2);
-                    if (matcherId1.find() && matcherId2.find()) {
-                        int id1No = CommonUtils.parseInt(matcherId1.group("name").replace("sky", ""), -1);
-                        int id2No = CommonUtils.parseInt(matcherId2.group("name").replace("sky", ""), -1);
-                        if (id1No >= 0 && id2No >= 0) {
-                            return id1No - id2No;
-                        }
+        skyboxResourceHelper.searchIn(skyParent).filter(id -> id.getPath().endsWith(".properties")).sorted(Comparator.comparing(ResourceLocation::getPath, (id1, id2) -> {
+            final Matcher matcherId1 = skyPattern.matcher(id1);
+            final Matcher matcherId2 = skyPattern.matcher(id2);
+            if (matcherId1.find() && matcherId2.find()) {
+                final int a = CommonUtils.safeParseInteger(matcherId1.group("name").replace("sky", ""), -1);
+                final int b = CommonUtils.safeParseInteger(matcherId2.group("name").replace("sky", ""), -1);
+                if (a >= 0 && b >= 0) {
+                    return a - b;
+                }
+            }
+            return 0;
+        })).forEach(id -> {
+            Matcher matcher = skyPattern.matcher(id.getPath());
+            if (matcher.find()) {
+                final String world = matcher.group("world");
+                final String name = matcher.group("name");
+                if (world == null || name == null) {
+                    return;
+                }
+
+                if (name.equals("moon_phases") || name.equals("sun")) {
+                    // TODO/NOTE: Support moon/sun
+                    LOGGER.warn("Skipping {}, moon_phases/sun aren't currently supported!", id);
+                    return;
+                }
+
+                final InputStream inputStream = skyboxResourceHelper.getInputStream(id);
+                if (inputStream == null) {
+                    LOGGER.error("Error trying to read namespaced identifier: {}", id);
+                    return;
+                }
+
+                final Properties properties = new Properties();
+                try {
+                    properties.load(inputStream);
+                } catch (IOException e) {
+                    LOGGER.error("Error trying to read properties from: {}", id);
+                    return;
+                } finally {
+                    try {
+                        inputStream.close();
+                    } catch (IOException e) {
+                        LOGGER.error("Error trying to close input stream at namespaced identifier: {}", id);
                     }
-                    return 0;
-                }))
-                .forEach(id -> {
-                    Matcher matcher = skyPattern.matcher(id.getPath());
-                    if (matcher.find()) {
-                        String world = matcher.group("world");
-                        String name = matcher.group("name");
-                        if (world == null || name == null) {
-                            return;
-                        }
+                }
 
-                        if (name.equals("moon_phases") || name.equals("sun")) {
-                            // TODO/NOTE: Support moon/sun
-                            LOGGER.info("Skipping {}, moon_phases/sun aren't supported!", id);
-                            return;
-                        }
-
-                        InputStream inputStream = skyboxResourceHelper.getInputStream(id);
-                        if (inputStream == null) {
-                            LOGGER.error("Error trying to read namespaced identifier: {}", id);
-                            return;
-                        }
-
-                        Properties properties = new Properties();
-                        try {
-                            properties.load(inputStream);
-                        } catch (IOException e) {
-                            LOGGER.error("Error trying to read properties from: {}", id);
-                            return;
-                        } finally {
-                            try {
-                                inputStream.close();
-                            } catch (IOException e) {
-                                LOGGER.error("Error trying to close input stream at namespaced identifier: {}", id);
-                            }
-                        }
-
-                        JsonObject json = CommonUtils.convertOptiFineSkyProperties(skyboxResourceHelper, properties, id);
-                        if (json != null) {
-                            if (world.equals("world0")) {
-                                overworldLayers.add(json);
-                            } else if (world.equals("world1")) {
-                                endLayers.add(json);
-                            }
-                        }
-                    }
-                });
+                final JsonObject json = CommonUtils.convertOptiFineSkyProperties(skyboxResourceHelper, properties, id);
+                switch (world) {
+                    case "world0" -> overworldLayers.add(json);
+                    case "world1" -> endLayers.add(json);
+                }
+            }
+        });
 
         if (!overworldLayers.isEmpty()) {
             JsonObject overworldJson = new JsonObject();
             overworldJson.add("layers", overworldLayers);
-            overworldJson.addProperty("world", "minecraft:overworld");
+            overworldJson.addProperty("world", Level.OVERWORLD.location().toString());
             SkyboxManager.INSTANCE.addSkybox(OptiFineSkybox.CODEC.decode(JsonOps.INSTANCE, overworldJson).getOrThrow().getFirst());
         }
 
         if (!endLayers.isEmpty()) {
             JsonObject endJson = new JsonObject();
             endJson.add("layers", endLayers);
-            endJson.addProperty("world", "minecraft:the_end");
+            endJson.addProperty("world", Level.END.location().toString());
             SkyboxManager.INSTANCE.addSkybox(OptiFineSkybox.CODEC.decode(JsonOps.INSTANCE, endJson).getOrThrow().getFirst());
         }
     }
