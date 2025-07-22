@@ -20,6 +20,7 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
+import org.jetbrains.annotations.Nullable;
 import org.joml.AxisAngle4f;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
@@ -59,15 +60,13 @@ public final class OptiFineSkyRenderer {
         }
 
         skyBufferIndices = RenderSystem.getSequentialBuffer(vertexFormatMode);
-        try (MeshData meshData = builder.build()) {
-            if (meshData != null) {
-                skyBufferIndexCount = meshData.drawState().indexCount();
-                skyBuffer = RenderSystem.getDevice().createBuffer(() -> "OptiFine skybox", BufferType.VERTICES, BufferUsage.STATIC_WRITE, meshData.vertexBuffer());
-            }
+        try (MeshData meshData = builder.buildOrThrow()) {
+            skyBufferIndexCount = meshData.drawState().indexCount();
+            skyBuffer = RenderSystem.getDevice().createBuffer(() -> "OptiFine skybox", BufferType.VERTICES, BufferUsage.STATIC_WRITE, meshData.vertexBuffer());
         }
     }
 
-    public static RenderPipeline getCustomSkyPipeline(BlendFunction blendFunction) {
+    public static RenderPipeline getSkyboxPipeline(@Nullable BlendFunction blendFunction) {
         RenderPipeline.Builder builder = RenderPipeline.builder(RenderPipelines.MATRICES_COLOR_SNIPPET);
         builder.withLocation(OptiBoxesClient.id("pipeline/custom_skybox"));
         builder.withVertexShader(OptiBoxesClient.id("core/custom_skybox"));
@@ -107,9 +106,14 @@ public final class OptiFineSkyRenderer {
             modelViewStack.pushMatrix();
             if (optiFineSkyLayer.rotate()) {
                 // NOTE: Using `mulPose` directly gives a different result.
-                final float angle = this.getAngle(level, skyAngle, optiFineSkyLayer.speed());
-                modelViewStack.rotate(new Quaternionf(new AxisAngle4f((float) Math.toRadians(angle), optiFineSkyLayer.axis())));
+                modelViewStack.rotate(new Quaternionf(new AxisAngle4f(this.getAngle(level, skyAngle, optiFineSkyLayer.speed()), optiFineSkyLayer.axis())));
             }
+
+            RenderPipeline renderPipeline = this.renderPipelineCache.computeIfAbsent(optiFineSkyLayer.source(), (resourceLocation) -> {
+                RenderPipeline pipeline = getSkyboxPipeline(optiFineSkyLayer.blend().getBlendFunction());
+                IrisUtil.assignPipeline(pipeline, IrisUtil.skyTextured());
+                return pipeline;
+            });
 
             optiFineSkyLayer.blend().apply(finalAlpha);
             RenderTarget renderTarget = Minecraft.getInstance().getMainRenderTarget();
@@ -118,11 +122,6 @@ public final class OptiFineSkyRenderer {
             try (RenderPass renderPass = RenderSystem.getDevice()
                     .createCommandEncoder()
                     .createRenderPass(renderTarget.getColorTexture(), OptionalInt.empty(), renderTarget.getDepthTexture(), OptionalDouble.empty())) {
-                RenderPipeline renderPipeline = this.renderPipelineCache.computeIfAbsent(optiFineSkyLayer.source(), (resourceLocation) -> {
-                    RenderPipeline pipeline = getCustomSkyPipeline(optiFineSkyLayer.blend().getBlendFunction());
-                    IrisUtil.assignPipeline(pipeline, IrisUtil.skyTextured());
-                    return pipeline;
-                });
                 renderPass.setPipeline(renderPipeline);
                 renderPass.setVertexBuffer(0, this.skyBuffer);
                 renderPass.setIndexBuffer(indexBuffer, this.skyBufferIndices.type());
@@ -143,7 +142,7 @@ public final class OptiFineSkyRenderer {
             angleDayStart = (float) (currentAngle % 1.0D);
         }
 
-        return 360.0F * (angleDayStart + skyAngle * speed);
+        return (float) Math.toRadians(360.0F * (angleDayStart + skyAngle * speed));
     }
 
     public void clearCache() {
