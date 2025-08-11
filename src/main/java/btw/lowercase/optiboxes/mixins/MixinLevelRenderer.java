@@ -54,12 +54,12 @@ public abstract class MixinLevelRenderer {
 
         original.call(instance);
         if (isEnabled) {
-            ClientLevel clientLevel = Objects.requireNonNull(this.level);
             Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
             modelViewStack.pushMatrix();
             modelViewStack.rotate(Axis.YP.rotationDegrees(-90.0F));
             for (OptiFineSkybox optiFineSkybox : SkyboxManager.INSTANCE.getActiveSkyboxes()) {
-                OptiFineSkyRenderer.INSTANCE.renderSkybox(optiFineSkybox, modelViewStack, clientLevel, 0.0F);
+                //noinspection DataFlowIssue
+                OptiFineSkyRenderer.INSTANCE.renderSkybox(optiFineSkybox, modelViewStack, this.level, 0.0F);
             }
             modelViewStack.popMatrix();
             RenderSystem.depthMask(true);
@@ -88,13 +88,13 @@ public abstract class MixinLevelRenderer {
     private void optiboxes$renderSkyboxes(SkyRenderer instance, PoseStack poseStack, MultiBufferSource.BufferSource bufferSource, float timeOfDay, int moonPhases, float rainLevel, float starBrightness, FogParameters fogParameters, Operation<Void> original) {
         boolean isEnabled = SkyboxManager.INSTANCE.isEnabled(this.level);
         if (isEnabled) {
-            ClientLevel clientLevel = Objects.requireNonNull(this.level);
             Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
             modelViewStack.pushMatrix();
             modelViewStack.rotate(Axis.YP.rotationDegrees(-90.0F));
             RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE, GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
             for (OptiFineSkybox optiFineSkybox : SkyboxManager.INSTANCE.getActiveSkyboxes()) {
-                OptiFineSkyRenderer.INSTANCE.renderSkybox(optiFineSkybox, modelViewStack, clientLevel, this.optiboxes$tickDelta);
+                //noinspection DataFlowIssue
+                OptiFineSkyRenderer.INSTANCE.renderSkybox(optiFineSkybox, modelViewStack, this.level, this.optiboxes$tickDelta);
             }
             modelViewStack.popMatrix();
         }
